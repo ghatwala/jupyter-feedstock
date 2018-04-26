@@ -2,8 +2,12 @@
 # update the conda-forge.yml and/or the recipe/meta.yaml.
 
 language: generic
+os:
+  - linux-ppc64le
+  - osx
+dist: xenial      # power jobs only on ubuntu-xenial distribution
+sudo: false       # deploy on workers with docker backend
 
-os: osx
 osx_image: xcode6.4
 
 env:
@@ -20,26 +24,36 @@ env:
 before_install:
     # Remove homebrew.
     - |
+      if [ "$TRAVIS_OS_NAME" != "linux-ppc64le" ]; then
       echo ""
       echo "Removing homebrew from Travis CI to avoid conflicts."
       curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/uninstall > ~/uninstall_homebrew
       chmod +x ~/uninstall_homebrew
       ~/uninstall_homebrew -fq
       rm ~/uninstall_homebrew
-
+      fi
 
 install:
     # Install Miniconda.
     - |
+      if [ "$TRAVIS_OS_NAME" != "linux-ppc64le" ]; then
       echo ""
       echo "Installing a fresh version of Miniconda."
       MINICONDA_URL="https://repo.continuum.io/miniconda"
       MINICONDA_FILE="Miniconda3-latest-MacOSX-x86_64.sh"
       curl -L -O "${MINICONDA_URL}/${MINICONDA_FILE}"
       bash $MINICONDA_FILE -b
+      else
+      echo "Installing a fresh version of Miniconda."
+      MINICONDA_URL="https://repo.continuum.io/miniconda"
+      MINICONDA_FILE="Miniconda3-latest-Linux-ppc64le.sh"
+      curl -L -O "${MINICONDA_URL}/${MINICONDA_FILE}"
+      bash $MINICONDA_FILE -b -p $HOME/miniconda
+      fi
 
     # Configure conda.
     - |
+      if [ "$TRAVIS_OS_NAME" != "linux-ppc64le" ]; then
       echo ""
       echo "Configuring conda."
       source /Users/travis/miniconda3/bin/activate root
@@ -49,8 +63,20 @@ install:
       conda config --set show_channel_urls true
       conda install --yes --quiet conda-forge-build-setup
       source run_conda_forge_build_setup
-
+      else
+      echo "Configuring conda."
+      export PATH="$HOME/miniconda/bin:$PATH"
+      hash -r 
+      conda config --set always_yes yes --set changeps1 no  
+      conda update -q conda
+      conda info -a
+      conda install -n root conda-build      
+      fi
+      
 script:
   - conda build ./recipe
 
-  - upload_or_check_non_existence ./recipe conda-forge --channel=main
+  - |
+    if [ "$TRAVIS_OS_NAME" != "linux-ppc64le" ]; then
+    upload_or_check_non_existence ./recipe conda-forge --channel=main
+    fi
